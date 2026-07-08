@@ -1,0 +1,79 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function myProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function myOrgId() {
+      return myProfile().data.orgId;
+    }
+
+    function myRole() {
+      return myProfile().data.role;
+    }
+
+    function isSameOrg(orgId) {
+      return isSignedIn() && myOrgId() == orgId;
+    }
+
+    function roleAtLeast(minRole) {
+      let rank = { 'employee': 0, 'manager': 1, 'admin': 2, 'owner': 3 };
+      return rank[myRole()] >= rank[minRole];
+    }
+
+    // ---- Users ----
+    // A user can read/update their own profile. Admin+ can read/update any
+    // profile within their own org (role changes are still also enforced
+    // server-side via /api/admin/users, which is the source of truth).
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || (isSameOrg(resource.data.orgId) && roleAtLeast('admin')));
+      allow create: if false; // profiles are only created server-side via Admin SDK on signup
+      allow update: if isSignedIn() && (request.auth.uid == uid || (isSameOrg(resource.data.orgId) && roleAtLeast('admin')));
+      allow delete: if false;
+    }
+
+    // ---- Organizations (tenants) ----
+    match /organizations/{orgId} {
+      allow read: if isSameOrg(orgId);
+      allow write: if false; // org documents are only mutated server-side (billing, admin APIs)
+
+      // Real-time metrics summaries — read-only from the client, written by
+      // a trusted backend job / Cloud Function that aggregates pulseEntries.
+      match /metricsSummaries/{docId} {
+        allow read: if isSameOrg(orgId);
+        allow write: if false;
+      }
+
+      // Daily presence + focus/collaboration pulse entries.
+      match /pulseEntries/{entryId} {
+        allow read: if isSameOrg(orgId) && roleAtLeast('manager');
+        allow create: if isSameOrg(orgId) && request.resource.data.uid == request.auth.uid;
+        allow update: if isSameOrg(orgId) && resource.data.uid == request.auth.uid;
+        allow delete: if false;
+      }
+
+      // Usage/activity log — written only by the trusted server (Admin SDK
+      // bypasses rules), read-only for admins for billing/analytics review.
+      match /usageEvents/{eventId} {
+        allow read: if isSameOrg(orgId) && roleAtLeast('admin');
+        allow write: if false;
+      }
+
+      // Peer-recognition "Wall of Fame" posts — any org member can read and
+      // post; posts are attributed to the authenticated author and are
+      // immutable once created (no edit/delete from the client).
+      match /shoutouts/{shoutoutId} {
+        allow read: if isSameOrg(orgId);
+        allow create: if isSameOrg(orgId) && request.resource.data.fromUid == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
