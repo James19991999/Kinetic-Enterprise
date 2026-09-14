@@ -74,6 +74,15 @@ service cloud.firestore {
         allow create: if isSameOrg(orgId) && request.resource.data.fromUid == request.auth.uid;
         allow update, delete: if false;
       }
+
+      // Audit log — owner/admin-readable, structurally never client-writable
+      // at any role. Only ever written server-side via the Admin SDK (which
+      // bypasses these rules) from signup, settings updates, and Stripe
+      // subscription lifecycle events.
+      match /auditLog/{entryId} {
+        allow read: if isSameOrg(orgId) && roleAtLeast('admin');
+        allow write: if false;
+      }
     }
   }
 }

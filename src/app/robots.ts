@@ -1,0 +1,15 @@
+import type { MetadataRoute } from 'next';
+import { APP_URL } from '@/lib/constants';
+
+export default function robots(): MetadataRoute.Robots {
+  return {
+    rules: [
+      {
+        userAgent: '*',
+        allow: ['/', '/about', '/privacy', '/terms', '/login', '/reset-password'],
+        disallow: ['/dashboard', '/analytics', '/equity', '/engagement', '/settings', '/admin', '/api'],
+      },
+    ],
+    sitemap: `${APP_URL}/sitemap.xml`,
+  };
+}
