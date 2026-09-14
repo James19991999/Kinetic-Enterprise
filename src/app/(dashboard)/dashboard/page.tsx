@@ -1,6 +1,6 @@
 import { getServerSession } from '@/lib/firebase/session';
 import { adminDb } from '@/lib/firebase/admin';
-import { MetricCard } from '@/components/dashboard/MetricCard';
+import { LiveMetricCards } from '@/components/dashboard/LiveMetricCards';
 import { GapCard, type Gap } from '@/components/dashboard/GapCard';
 import { PresenceToggle } from '@/components/dashboard/PresenceToggle';
 import type { MetricsSummary, PulseEntry } from '@/types';
@@ -52,7 +52,7 @@ export default async function DashboardHomePage() {
     getTodayPresence(session.orgId, session.uid),
   ]);
 
-  const summary = summarySnap.docs[0]?.data() as MetricsSummary | undefined;
+  const summary = (summarySnap.docs[0]?.data() as MetricsSummary | undefined) ?? null;
 
   return (
     <div className="space-y-lg">
@@ -61,38 +61,7 @@ export default async function DashboardHomePage() {
         <PresenceToggle initial={presence} />
       </div>
 
-      {!summary && (
-        <p className="rounded-md bg-surface-container-low p-md text-body-sm text-on-surface-variant">
-          No metrics yet — numbers will appear here once your team starts submitting daily check-ins.
-        </p>
-      )}
-
-      <div className="grid grid-cols-1 gap-md md:grid-cols-4">
-        <MetricCard
-          label="Office Utilization"
-          value={summary ? `${summary.officeUtilization}%` : '—'}
-          icon="apartment"
-          href="/analytics"
-        />
-        <MetricCard
-          label="Avg. Focus Hours"
-          value={summary ? `${summary.avgFocusHours}h` : '—'}
-          icon="schedule"
-          href="/analytics"
-        />
-        <MetricCard
-          label="Engagement Score"
-          value={summary ? String(summary.engagementScore) : '—'}
-          icon="favorite"
-          href="/engagement"
-        />
-        <MetricCard
-          label="Equity Gap Score"
-          value={summary ? String(summary.equityGapScore) : '—'}
-          icon="balance"
-          href="/equity"
-        />
-      </div>
+      <LiveMetricCards orgId={session.orgId} initialSummary={summary} />
 
       <section>
         <div className="mb-sm flex items-center justify-between">

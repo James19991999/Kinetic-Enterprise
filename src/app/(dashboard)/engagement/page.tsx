@@ -2,6 +2,7 @@ import { getServerSession } from '@/lib/firebase/session';
 import { adminDb } from '@/lib/firebase/admin';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { CheckInForm } from '@/components/dashboard/CheckInForm';
+import { TeamPulse } from '@/components/dashboard/TeamPulse';
 import type { MetricsSummary, PulseEntry } from '@/types';
 
 export default async function EngagementPage() {
@@ -45,6 +46,16 @@ export default async function EngagementPage() {
         <h2 className="text-headline-sm">Daily Pulse Check-in</h2>
         <div className="mt-sm">
           <CheckInForm initial={todayEntry} />
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-headline-sm">Team Pulse</h2>
+        <p className="mt-xs text-body-sm text-on-surface-variant">
+          Real-time peer recognition — visible to your whole organization.
+        </p>
+        <div className="mt-sm">
+          <TeamPulse orgId={session.orgId} />
         </div>
       </section>
     </div>

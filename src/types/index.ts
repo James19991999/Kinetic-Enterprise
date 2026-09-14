@@ -69,6 +69,15 @@ export interface MetricsSummary {
   updatedAt?: string;
 }
 
+export interface Shoutout {
+  id: string;
+  fromUid: string;
+  fromDisplayName: string;
+  toDisplayName: string;
+  message: string;
+  createdAt?: string;
+}
+
 export interface UsageEvent {
   id: string;
   uid: string;

@@ -66,13 +66,14 @@ service cloud.firestore {
         allow write: if false;
       }
 
-      // Peer-recognition "Wall of Fame" posts — any org member can read and
-      // post; posts are attributed to the authenticated author and are
-      // immutable once created (no edit/delete from the client).
+      // Peer-recognition "Team Pulse" feed on the Engagement page — any org
+      // member can read live via onSnapshot. Writes go through the RBAC
+      // chokepoint at POST /api/shoutouts (session-verified, Admin SDK),
+      // matching the same server-write convention as usageEvents/auditLog
+      // rather than allowing an unauthenticated-role client write path.
       match /shoutouts/{shoutoutId} {
         allow read: if isSameOrg(orgId);
-        allow create: if isSameOrg(orgId) && request.resource.data.fromUid == request.auth.uid;
-        allow update, delete: if false;
+        allow write: if false;
       }
 
       // Audit log — owner/admin-readable, structurally never client-writable
