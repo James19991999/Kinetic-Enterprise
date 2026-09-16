@@ -1,42 +1,42 @@
 import { rateLimit, getClientIp } from '@/lib/rateLimit';
 
-describe('rateLimit', () => {
-  it('allows requests under the limit', () => {
+// No UPSTASH_REDIS_REST_URL / TOKEN are set in the test environment, so
+// rateLimit() exercises its in-memory fallback path here. The Redis-backed
+// path is exercised by rateLimit.redis.test.ts using a mocked Upstash client.
+
+describe('rateLimit (in-memory fallback)', () => {
+  it('allows requests under the limit', async () => {
     const key = `test-${Math.random()}`;
-    const first = rateLimit(key, 3, 60_000);
-    const second = rateLimit(key, 3, 60_000);
+    const first = await rateLimit(key, 3, 60_000);
+    const second = await rateLimit(key, 3, 60_000);
     expect(first.success).toBe(true);
     expect(second.success).toBe(true);
     expect(second.remaining).toBe(1);
   });
 
-  it('blocks requests once the limit is exceeded', () => {
+  it('blocks requests once the limit is exceeded', async () => {
     const key = `test-${Math.random()}`;
-    rateLimit(key, 2, 60_000);
-    rateLimit(key, 2, 60_000);
-    const third = rateLimit(key, 2, 60_000);
+    await rateLimit(key, 2, 60_000);
+    await rateLimit(key, 2, 60_000);
+    const third = await rateLimit(key, 2, 60_000);
     expect(third.success).toBe(false);
     expect(third.remaining).toBe(0);
   });
 
-  it('tracks separate keys independently', () => {
+  it('tracks separate keys independently', async () => {
     const keyA = `a-${Math.random()}`;
     const keyB = `b-${Math.random()}`;
-    rateLimit(keyA, 1, 60_000);
-    const resultB = rateLimit(keyB, 1, 60_000);
+    await rateLimit(keyA, 1, 60_000);
+    const resultB = await rateLimit(keyB, 1, 60_000);
     expect(resultB.success).toBe(true);
   });
 
-  it('resets after the window expires', () => {
+  it('resets after the window expires', async () => {
     const key = `test-${Math.random()}`;
-    rateLimit(key, 1, 10); // 10ms window
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        const result = rateLimit(key, 1, 10);
-        expect(result.success).toBe(true);
-        resolve();
-      }, 20);
-    });
+    await rateLimit(key, 1, 10); // 10ms window
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const result = await rateLimit(key, 1, 10);
+    expect(result.success).toBe(true);
   });
 });
 

@@ -41,6 +41,16 @@ See `.env.local.example` for the full list. You need:
 firebase deploy --only firestore:rules,firestore:indexes
 ```
 
+### Metrics aggregation cron
+
+The dashboard's live metric cards (`metricsSummaries`) are populated by
+`GET /api/cron/aggregate-metrics`, which rolls up the last 24h of
+`pulseEntries` per organization. `vercel.json` schedules this every 15
+minutes on Vercel; set `CRON_SECRET` in your environment (see
+`.env.local.example`) so the endpoint can verify the caller. Deploying
+elsewhere, point any scheduler that can send an `Authorization: Bearer`
+header at the same route on whatever interval you'd like.
+
 ## Scripts
 
 | Command                | Description                          |

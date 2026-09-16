@@ -111,9 +111,9 @@ Design choices:
   request.
 - `pulseEntries` doc IDs are deterministic (`{uid}_{date}`) so a resubmitted
   check-in for the same day overwrites rather than duplicates.
-- `metricsSummaries` is written by a trusted aggregation job (Cloud Function
-  or scheduled server task, out of scope here) — clients only ever read it,
-  enforced by `firestore.rules`.
+- `metricsSummaries` is written by a trusted aggregation job
+  (`GET /api/cron/aggregate-metrics`, run on a schedule — see §12) — clients
+  only ever read it, enforced by `firestore.rules`.
 
 ## 4. Authentication + RBAC
 
@@ -267,17 +267,32 @@ These were considered and deliberately left out rather than half-built:
   Stripe cancellation should sequence with data deletion — these are
   product decisions, not just code. Shipping a partial version risked
   orphaned orgs or silent data loss, which is worse than not having it yet.
-- **Real, shared-store rate limiting**: the current in-memory limiter is a
-  real improvement over nothing but is per-instance; production at scale
-  needs Redis-backed limiting.
-- **Content Security Policy header**: not added, because getting a CSP
-  right for a Firebase-Auth-popup + Stripe-Checkout-redirect + Google-Fonts
-  app requires testing against live credentials to avoid silently breaking
-  sign-in — better to add and tune this after a real Firebase project is
-  wired up than ship an untested policy.
-- **CI/CD pipeline, e2e tests (Playwright), dark mode toggle, i18n**: all
-  reasonable next steps for a maturing product, but each is a substantial
-  scope addition in its own right rather than a "fix."
+- **Real, shared-store rate limiting**: implemented — `lib/rateLimit.ts`
+  uses Upstash Redis (sliding window, shared across every serverless
+  instance) when `UPSTASH_REDIS_REST_URL`/`UPSTASH_REDIS_REST_TOKEN` are
+  set, falling back to the original in-memory limiter otherwise (and if
+  Redis itself errors, so a limiter outage never blocks login/signup). See
+  `.env.local.example`.
+- **Content Security Policy header**: implemented in `next.config.mjs`,
+  scoped to what the app actually loads (Firebase Auth/Firestore, Google
+  OAuth popup, Stripe Checkout, Google Fonts). `script-src` still allows
+  `'unsafe-inline'` rather than a nonce, since Next.js injects an inline
+  hydration bootstrap script and a strict nonce-based policy needs to be
+  verified against a live Firebase project first — a broken CSP can
+  silently break sign-in. The rest of the policy (`object-src 'none'`,
+  `frame-ancestors 'self'`, a scoped `connect-src`/`img-src`/`frame-src`
+  allowlist) is already strict.
+- **CI/CD pipeline**: `.github/workflows/ci.yml` runs lint, typecheck, unit
+  tests (with coverage), and a production build on every push/PR, plus a
+  separate `e2e` job (see below).
+- **E2e tests (Playwright)**: `e2e/` covers what's testable without a live
+  Firebase/Stripe project — public pages, the login form's markup and
+  mode-switching, and the signed-out middleware redirect. See
+  `e2e/README.md` for what's deliberately out of scope (anything needing
+  real Auth/Stripe) and why.
+- **Dark mode toggle, i18n**: still reasonable next steps for a maturing
+  product, each a substantial scope addition in its own right rather than a
+  "fix."
 
 ## 12. Known gaps / next steps for production deployment
 
@@ -286,9 +301,13 @@ These were considered and deliberately left out rather than half-built:
   instead (documented in `src/app/layout.tsx`). On Vercel (open network),
   switch to `next/font/google` for self-hosted, zero-layout-shift fonts.
 - `metricsSummaries` aggregation (rolling up `pulseEntries` into org-wide
-  numbers for the Home dashboard's metric cards) is intentionally left as a
-  stub for a scheduled Cloud Function — this is the next-highest-value piece
-  to wire up after isolation detection (§8), which is already real.
+  numbers for the Home dashboard's metric cards) is implemented:
+  `lib/metricsAggregation.ts` has the pure scoring logic (unit tested, same
+  pattern as `lib/pulse.ts`), `lib/firebase/metricsAggregation.ts` does the
+  Firestore I/O per org, and `GET /api/cron/aggregate-metrics` is the
+  scheduled entry point — protected by `CRON_SECRET` and wired to run every
+  15 minutes via `vercel.json`. See the README's "Metrics aggregation cron"
+  section for wiring this to a non-Vercel scheduler.
 - **Still sample/illustrative, not computed**: the Home and Analytics pages'
   "Daily Gaps" / "Communication Blind Spots" lists (would need a
   calendar/Slack integration to detect real missed syncs), and the Equity

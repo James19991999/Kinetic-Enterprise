@@ -12,7 +12,7 @@ const bodySchema = z.object({ idToken: z.string().min(1) });
 
 export async function POST(request: Request) {
   const ip = getClientIp(request);
-  const limit = rateLimit(`login:${ip}`, 10, 5 * 60_000);
+  const limit = await rateLimit(`login:${ip}`, 10, 5 * 60_000);
   if (!limit.success) {
     return NextResponse.json({ error: 'Too many attempts. Please try again shortly.' }, { status: 429 });
   }
